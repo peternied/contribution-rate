@@ -1,0 +1,4 @@
+.token
+.request_cache
+output
+__pycache__
