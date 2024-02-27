@@ -13,6 +13,7 @@ GITHUB_PULLS_URL = GITHUB_API_BASE_URL + "/pulls"
 HEADERS = {"Accept": "application/vnd.github.v3+json"}
 OUTPUT_DIR = "./output/"
 PAGE_COUNT_LIMIT=5
+ARGS = None
 
 
 def get_pull_requests(since=None, pr_number=None):
@@ -46,9 +47,6 @@ def get_pull_requests(since=None, pr_number=None):
     return fetch_github_data(GITHUB_PULLS_URL, params)
 
 
-import requests
-
-
 def fetch_github_data(url, params=None):
     """
     Fetches data from GitHub API handling pagination automatically.
@@ -78,7 +76,7 @@ def fetch_github_data(url, params=None):
             break
         url = response.links["next"]["url"]  # Update the URL to fetch the next page
         pages += 1
-        if pages == 6:
+        if pages == ARGS.page_limit:
             print(f"Leaving early for easy of debugging")
             break
 
@@ -229,14 +227,15 @@ def main():
     )
     parser.add_argument("--pr", help="Collect data for a specific PR number.", type=int)
     parser.add_argument("--page-limit", help="Limit how much data is pulled from GitHub by page count", type=int, default=PAGE_COUNT_LIMIT)
-    args = parser.parse_args()
+    global ARGS
+    ARGS = parser.parse_args()
 
-    HEADERS["Authorization"] = f"Bearer {args.token}"
+    HEADERS["Authorization"] = f"Bearer {ARGS.token}"
 
-    args.token = "<HIDDEN>"
-    print(f'Arguments: {args}')
+    ARGS.token = "<HIDDEN>"
+    print(f'Arguments: {ARGS}')
 
-    pull_requests = get_pull_requests(args.since, args.pr)
+    pull_requests = get_pull_requests(ARGS.since, ARGS.pr)
     pr_metrics = calculate_metrics(pull_requests)
     print_metrics(pr_metrics)
 
