@@ -186,7 +186,7 @@ def calculate_metrics(pull_requests):
                 if comment["user"]["login"] in ['github-actions[bot]'] and ':x: Gradle check result' in comment['body']
             )
         )
-    df["number_of_gradle_check_failures"] = df.apply(get_number_of_gradle_check_failures, axis=1)
+    df["gradle_check_failures"] = df.apply(get_number_of_gradle_check_failures, axis=1)
     
     df['user_login'] = df['user'].apply(lambda x: x['login'])
 
@@ -199,15 +199,16 @@ def calculate_metrics(pull_requests):
 def print_metrics(raw_metrics):
     pd.set_option('display.float_format', '{:,.1f}'.format)
 
-    weekly_metrics = raw_metrics.resample("W").agg(
+    weekly_metrics = raw_metrics.groupby('type_of_contribution').resample("W").agg(
         {
             "number": "size",  # Number of PRs
             "business_days_to_merge": "mean",
             "number_of_commenters": "mean",
-            "number_of_gradle_check_failures": "mean",
+            "gradle_check_failures": "mean",
         }
     )
-    weekly_metrics.index = weekly_metrics.index.strftime('%Y-%m-%d')
+    weekly_metrics = weekly_metrics.reset_index()
+    weekly_metrics['created_at'] = weekly_metrics['created_at'].dt.strftime('%Y-%m-%d')
 
     weekly_metrics_csv = OUTPUT_DIR + "weekly_metrics.csv"
     print(f"Writing weekly_metrics metrics to {weekly_metrics_csv}")
@@ -240,7 +241,7 @@ def print_metrics(raw_metrics):
                 "number_of_comments": "mean",
                 "number_of_pushes": "mean",
                 "number_of_pushes": "mean",
-                "number_of_gradle_check_failures": "mean"
+                "gradle_check_failures": "mean"
             }
         )
         .sort_values(by='number', ascending=False)
