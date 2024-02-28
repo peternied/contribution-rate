@@ -14,6 +14,7 @@ HEADERS = {"Accept": "application/vnd.github.v3+json"}
 OUTPUT_DIR = "./output/"
 PAGE_COUNT_LIMIT=5
 ARGS = None
+BOTS_TO_IGNORE = ['opensearch-trigger-bot[bot]', 'codecov', 'dependabot[bot]']
 
 
 def get_pull_requests(since=None, pr_number=None):
@@ -91,6 +92,13 @@ def fetch_pr_comments(pr_number, last_modified_time):
     )
     return comments
 
+def fetch_pr_events(pr_number, last_modified_time):
+    url = f"{GITHUB_API_BASE_URL}/issues/{pr_number}/events"
+    events = request_data.fetch(
+        pr_number, url, last_modified_time, fetch_github_data
+    )
+    return events
+
 
 def calculate_metrics(pull_requests):
     """
@@ -105,6 +113,15 @@ def calculate_metrics(pull_requests):
     df["created_at"] = pd.to_datetime(df["created_at"])
     df["merged_at"] = pd.to_datetime(df["merged_at"])
 
+    def categorize_contribution(row):
+        if row['user']['login'] in BOTS_TO_IGNORE:
+            return 'AUTOMATION'
+        if row['author_association'] == 'FIRST_TIME_CONTRIBUTOR':
+            return 'CONTRIBUTOR'
+        return row['author_association']
+
+    df["type_of_contribution"] = df.apply(categorize_contribution, axis=1)
+
     # Calculate business hours from open to merged
     df["business_days_to_merge"] = df.apply(
         lambda row: (
@@ -115,14 +132,13 @@ def calculate_metrics(pull_requests):
         axis=1,
     )
 
-    # Example of calculating number of commenters and comments
-    # You will need to adjust this based on how comments data is structured and fetched
     df["number_of_commenters"] = df.apply(
         lambda row: (
             len(
                 set(
                     comment["user"]["login"]
                     for comment in fetch_pr_comments(row["number"], row["updated_at"])
+                    if comment["user"]["login"] not in BOTS_TO_IGNORE
                 )
             )
             if pd.notnull(row["updated_at"])
@@ -130,16 +146,49 @@ def calculate_metrics(pull_requests):
         ),
         axis=1,
     )
-    # df['number_of_commenters'] = pd.to_numeric(df['number_of_commenters'], errors='coerce')
 
     df["number_of_comments"] = df.apply(
         lambda row: (
-            len(fetch_pr_comments(row["number"], row["updated_at"]))
+            len(
+                list(
+                    comment
+                    for comment in fetch_pr_comments(row["number"], row["updated_at"])
+                    if comment["user"]["login"] not in BOTS_TO_IGNORE
+                )
+            )
             if pd.notnull(row["updated_at"])
             else np.nan
         ),
         axis=1,
     )
+
+    def get_number_of_pushes(row):
+        if pd.isnull(row["updated_at"]):
+            return np.nan
+
+        return len(
+            list(
+                event
+                for event in fetch_pr_events(row["number"], row["updated_at"])
+                if event['event'] in ['committed', 'head_ref_force_pushed']
+            )
+        )
+    df["number_of_pushes"] = df.apply(get_number_of_pushes, axis=1)
+
+    def get_number_of_gradle_check_failures(row):
+        if pd.isnull(row["updated_at"]):
+            return np.nan
+
+        return len(
+            list(
+                comment
+                for comment in fetch_pr_comments(row["number"], row["updated_at"])
+                if comment["user"]["login"] in ['github-actions[bot]'] and ':x: Gradle check result' in comment['body']
+            )
+        )
+    df["number_of_gradle_check_failures"] = df.apply(get_number_of_gradle_check_failures, axis=1)
+    
+    df['user_login'] = df['user'].apply(lambda x: x['login'])
 
     # Group by week and calculate aggregate metrics
     df.set_index("created_at", inplace=True)
@@ -148,14 +197,17 @@ def calculate_metrics(pull_requests):
 
 
 def print_metrics(raw_metrics):
+    pd.set_option('display.float_format', '{:,.1f}'.format)
+
     weekly_metrics = raw_metrics.resample("W").agg(
         {
             "number": "size",  # Number of PRs
-            "business_days_to_merge": "mean",  # Average business hours to merge
-            "number_of_commenters": "mean",  # Average number of commenters (example)
-            # 'number_of_comments': 'sum',  # Total number of comments (example)
+            "business_days_to_merge": "mean",
+            "number_of_commenters": "mean",
+            "number_of_gradle_check_failures": "mean",
         }
     )
+    weekly_metrics.index = weekly_metrics.index.strftime('%Y-%m-%d')
 
     weekly_metrics_csv = OUTPUT_DIR + "weekly_metrics.csv"
     print(f"Writing weekly_metrics metrics to {weekly_metrics_csv}")
@@ -163,18 +215,40 @@ def print_metrics(raw_metrics):
     print(weekly_metrics)
 
     grouped_metrics = (
-        raw_metrics.groupby("number_of_commenters")
+        raw_metrics.groupby("type_of_contribution")
         .agg(
             {
                 "number": "size",
                 "business_days_to_merge": "count",
                 "business_days_to_merge": "mean",
+                "number_of_commenters": "mean",
                 "number_of_comments": "mean",
             }
         )
         .reset_index()
     )
     print(grouped_metrics)
+
+    contributor_metrics = (
+        raw_metrics.groupby(['type_of_contribution', 'user_login'])
+        .agg(
+            {
+                "number": "size",
+                "business_days_to_merge": "count",
+                "business_days_to_merge": "mean",
+                "number_of_commenters": "mean",
+                "number_of_comments": "mean",
+                "number_of_pushes": "mean",
+                "number_of_pushes": "mean",
+                "number_of_gradle_check_failures": "mean"
+            }
+        )
+        .sort_values(by='number', ascending=False)
+        .nlargest(10, ['number'])
+        .reset_index()
+    )
+    with pd.option_context('display.max_rows', None):
+        print(contributor_metrics)
 
 
 def simplified_business_hours(start, end):
