@@ -5,7 +5,25 @@ Small python executable to measure details impacting contribution rate for OpenS
 
 ## Usage
 
-`python3 github_pr_analyzer.py --token=<READONLY_PERSONAL_ACCESS_TOKEN> --since 2022-01-01`
+```
+usage: github_pr_analyzer.py [-h] --token TOKEN [--since SINCE] [--pr PR] [--page-limit PAGE_LIMIT] [--non-github-delay-seconds NON_GITHUB_DELAY_SECONDS] [--github-owner GITHUB_OWNER] [--github-repo GITHUB_REPO]
+
+Analyze GitHub Pull Requests.
+
+options:
+  -h, --help            show this help message and exit
+  --token TOKEN         GitHub API token
+  --since SINCE         Collect PRs updated after this date (YYYY-MM-DD).
+  --pr PR               Collect data for a specific PR number.
+  --page-limit PAGE_LIMIT
+                        Limit how much data is pulled from GitHub by page count
+  --non-github-delay-seconds NON_GITHUB_DELAY_SECONDS
+                        Delay between requests for non-github sources
+  --github-owner GITHUB_OWNER
+                        GitHub owner of the repository
+  --github-repo GITHUB_REPO
+                        GitHub repository
+```
 
 ### Example output
 ```
