@@ -36,7 +36,7 @@ def fetch(pr_number, url, last_modified_time, fetch_function):
     cache_data = load_from_cache(pr_number, url, last_modified_time)
     if cache_data is not None:
         print(
-            f"Loading data from cache for PR #{pr_number} and URL '{url}' with timestamp {last_modified_time}."
+            f"Loading data from cache {get_cache_filename(pr_number, url, last_modified_time)} for PR #{pr_number} and URL '{url}' with timestamp {last_modified_time}."
         )
         return cache_data
     else:

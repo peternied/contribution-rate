@@ -3,7 +3,9 @@ from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
+import re
 import requests
+import time
 
 import request_data
 
@@ -99,6 +101,22 @@ def fetch_pr_events(pr_number, last_modified_time):
     )
     return events
 
+def fetch_test_results(base_url, pr_number, last_modified_time):
+    url = f"{base_url}/testReport/api/json?tree=suites[cases[status,className,name]]"
+    test_results = request_data.fetch(
+        pr_number, url, last_modified_time, fetch_json_data
+    )
+    return test_results
+
+def fetch_json_data(url):
+    print(f"Starting GET {url}...")
+    time.sleep(1)
+    response = requests.get(url, headers=HEADERS, params=None)
+    if response.status_code != 200:
+        print(f"Error fetching data: {response.status_code}")
+        raise "Failed"
+    return response.json()
+
 
 def calculate_metrics(pull_requests):
     """
@@ -187,13 +205,49 @@ def calculate_metrics(pull_requests):
             )
         )
     df["gradle_check_failures"] = df.apply(get_number_of_gradle_check_failures, axis=1)
-    
+
+    def filter_to_test_failures(test_results):
+        if not(isinstance(test_results, dict)) or len(test_results) != 2:
+            return []
+
+        all_cases = [case for suite in test_results['suites'] for case in suite['cases']]
+        failed_cases = [f"{case['className']}.{case['name']}" for case in all_cases if case['status'] in ["FAILED", "REGRESSION"]]
+        return failed_cases
+
+    def get_failing_tests(row):
+        if pd.isnull(row["updated_at"]):
+            return np.nan
+
+        failing_check_urls = list(
+            extract_url(comment['body'])
+            for comment in fetch_pr_comments(row["number"], row["updated_at"])
+            if comment["user"]["login"] in ['github-actions[bot]'] and ':x: Gradle check result' in comment['body']
+        )
+        list_of_failing_tests = [
+            failure
+            for failing_check_url in failing_check_urls
+            for failure in filter_to_test_failures(fetch_test_results(failing_check_url, row["number"], row["updated_at"]))
+        ]
+        return list_of_failing_tests
+
+
+    df['failing_tests'] = df.apply(get_failing_tests, axis=1)
+
     df['user_login'] = df['user'].apply(lambda x: x['login'])
 
     # Group by week and calculate aggregate metrics
     df.set_index("created_at", inplace=True)
 
     return df
+
+def extract_url(comment_string):
+    pattern = r'\[.*?\]\((https?://[^\s]+)\)'
+    match = re.search(pattern, comment_string)
+
+    if match:
+        return match.group(1)  # group(1) refers to the matched URL inside the parentheses
+    else:
+        return None
 
 
 def print_metrics(raw_metrics):
@@ -202,9 +256,9 @@ def print_metrics(raw_metrics):
     weekly_metrics = raw_metrics.groupby('type_of_contribution').resample("W").agg(
         {
             "number": "size",  # Number of PRs
-            "business_days_to_merge": "mean",
-            "number_of_commenters": "mean",
-            "gradle_check_failures": "mean",
+            "business_days_to_merge": "sum",
+            "number_of_commenters": "sum",
+            "gradle_check_failures": "sum",
         }
     )
     weekly_metrics = weekly_metrics.reset_index()
@@ -250,6 +304,24 @@ def print_metrics(raw_metrics):
     )
     with pd.option_context('display.max_rows', None):
         print(contributor_metrics)
+
+    # Capture test failures within the past 30 days
+    one_month_ago = datetime.now() - timedelta(days=30)
+    failing_test_exploded = raw_metrics.explode('failing_tests').reset_index()
+    failing_test_exploded['created_at_date'] = pd.to_datetime(failing_test_exploded['created_at']).dt.tz_localize(None)
+    failing_test_exploded = failing_test_exploded[failing_test_exploded['created_at_date'] >= one_month_ago]
+
+    failures_by_prs = failing_test_exploded.groupby('failing_tests')['number'].apply(list).reset_index(name='pr_numbers')
+    failures_by_prs['unique_pr_count'] = failures_by_prs['pr_numbers'].apply(lambda x: len(set(x)))
+    top_test_impacting_prs = failures_by_prs[failures_by_prs['unique_pr_count'] >= 2].nlargest(20, 'unique_pr_count')
+
+
+    top_test_impacting_prs_csv = OUTPUT_DIR + "top_test_failures.csv"
+    print(f"Writing weekly_metrics metrics to {top_test_impacting_prs_csv}")
+    top_test_impacting_prs.to_csv(top_test_impacting_prs_csv)
+    print(top_test_impacting_prs)
+
+
 
 
 def simplified_business_hours(start, end):
