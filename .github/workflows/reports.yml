@@ -21,13 +21,14 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: .request_cache/**
+          save-always: true
           key: request-cache-${{ hashFiles('request_cache.py') }}
 
       - run: |
           pip install -r requirements.txt
 
       - run: |
-          python github_pr_analyzer.py --token ${{ secrets.REPORTS_GITHUB_TOKEN }} --github-owner opensearch-project --github-repo OpenSearch --page-limit 2
+          python github_pr_analyzer.py --token ${{ secrets.REPORTS_GITHUB_TOKEN }} --github-owner opensearch-project --github-repo OpenSearch
       
       - run: |
           mkdir -p reports/${{ env.TIMESTAMP }}
@@ -41,7 +42,5 @@ jobs:
           git config --global user.name 'GitHub Actions'
           git config --global user.email 'actions@github.com'
           git add README.md reports/
-          git status
-          git diff
-      #     git commit -m "Update reports and README for ${{ env.TIMESTAMP }}"
-      #     git push
+          git commit -m "Update reports and README for ${{ env.TIMESTAMP }}"
+          git push
