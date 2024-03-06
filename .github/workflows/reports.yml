@@ -8,9 +8,10 @@ on:
 jobs:
   generate-report:
     runs-on: ubuntu-latest
-    env:
-      TIMESTAMP: $(date +'%Y%m%d')
     steps:
+      - run: |
+          echo "TIMESTAMP=$(date +'%Y%m%d')" >> $GITHUB_ENV
+
       - uses: actions/checkout@v2
       
       - uses: actions/setup-python@v2
@@ -30,11 +31,11 @@ jobs:
           python github_pr_analyzer.py --token ${{ secrets.REPORTS_GITHUB_TOKEN }} --github-owner opensearch-project --github-repo OpenSearch
       
       - run: |
-          mkdir -p reports/$TIMESTAMP
-          mv .output/*.csv reports/$TIMESTAMP/
+          mkdir -p reports/${{ env.TIMESTAMP }}
+          mv .output/*.csv reports/${{ env.TIMESTAMP }}/
       
       - run: |
-          python scripts/update_readme.py $TIMESTAMP
+          python scripts/update_readme.py ${{ env.TIMESTAMP }}
 
       - name: Commit and push updates
         run: |
@@ -42,5 +43,5 @@ jobs:
           git config --global user.email 'actions@github.com'
           git add README.md reports/
           git status
-      #     git commit -m "Update reports and README for $TIMESTAMP"
+      #     git commit -m "Update reports and README for ${{ env.TIMESTAMP }}"
       #     git push
