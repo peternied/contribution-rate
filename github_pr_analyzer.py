@@ -30,7 +30,7 @@ def get_pull_requests(since=None, pr_number=None):
         "state": "closed",
         "sort": "created",
         "direction": "desc",
-        "per_page": 25,
+        "per_page": 100,
     }
 
     if since:
