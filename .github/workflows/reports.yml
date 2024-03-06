@@ -28,11 +28,11 @@ jobs:
           pip install -r requirements.txt
 
       - run: |
-          python github_pr_analyzer.py --token ${{ secrets.REPORTS_GITHUB_TOKEN }} --github-owner opensearch-project --github-repo OpenSearch
+          python github_pr_analyzer.py --token ${{ secrets.REPORTS_GITHUB_TOKEN }} --github-owner opensearch-project --github-repo OpenSearch --page-limit 2
       
       - run: |
           mkdir -p reports/${{ env.TIMESTAMP }}
-          mv .output/*.csv reports/${{ env.TIMESTAMP }}/
+          mv output/*.csv reports/${{ env.TIMESTAMP }}/
       
       - run: |
           python scripts/update_readme.py ${{ env.TIMESTAMP }}
