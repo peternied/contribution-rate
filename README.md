@@ -2,6 +2,9 @@
 
 Small python executable to measure details impacting contribution rate for OpenSearch 
 
+## Reports
+<!-- REPORTS_START -->
+<!-- REPORTS_END -->
 
 ## Usage
 

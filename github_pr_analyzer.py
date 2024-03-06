@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import requests
 
-import request_data
+import request_cache
 
 # Constants
 HEADERS = {"Accept": "application/vnd.github.v3+json"}
@@ -91,19 +91,19 @@ def fetch_github_data(url, params=None):
 
 def fetch_pr_comments(pr_number, last_modified_time):
     url = f"{github_url()}/issues/{pr_number}/comments"
-    comments = request_data.fetch(pr_number, url, last_modified_time, fetch_github_data)
+    comments = request_cache.fetch(pr_number, url, last_modified_time, fetch_github_data)
     return comments
 
 
 def fetch_pr_events(pr_number, last_modified_time):
     url = f"{github_url()}/issues/{pr_number}/events"
-    events = request_data.fetch(pr_number, url, last_modified_time, fetch_github_data)
+    events = request_cache.fetch(pr_number, url, last_modified_time, fetch_github_data)
     return events
 
 
 def fetch_test_results(base_url, pr_number, last_modified_time):
     url = f"{base_url}/testReport/api/json?tree=suites[cases[status,className,name]]"
-    test_results = request_data.fetch(
+    test_results = request_cache.fetch(
         pr_number, url, last_modified_time, fetch_json_data
     )
     return test_results
@@ -287,12 +287,12 @@ def print_metrics(raw_metrics):
     weekly_metrics = weekly_metrics.reset_index()
     weekly_metrics["created_at"] = weekly_metrics["created_at"].dt.strftime("%Y-%m-%d")
 
-    weekly_metrics_csv = OUTPUT_DIR + "weekly_metrics.csv"
+    weekly_metrics_csv = OUTPUT_DIR + "business_days_to_merge_by_week.csv"
     print(f"Writing weekly_metrics metrics to {weekly_metrics_csv}")
     weekly_metrics.to_csv(weekly_metrics_csv)
     print(weekly_metrics)
 
-    grouped_metrics = (
+    prs_by_type_of_contribution_metrics = (
         raw_metrics.groupby("type_of_contribution")
         .agg(
             {
@@ -305,7 +305,9 @@ def print_metrics(raw_metrics):
         )
         .reset_index()
     )
-    print(grouped_metrics)
+    print(prs_by_type_of_contribution_metrics)
+    prs_by_type_of_contribution_metrics_csv = OUTPUT_DIR + "pull_requests_metrics_by_type_of_contribution.csv"
+    prs_by_type_of_contribution_metrics.to_csv(prs_by_type_of_contribution_metrics_csv)
 
     contributor_metrics = (
         raw_metrics.groupby(["type_of_contribution", "user_login"])
@@ -322,11 +324,12 @@ def print_metrics(raw_metrics):
             }
         )
         .sort_values(by="number", ascending=False)
-        .nlargest(10, ["number"])
         .reset_index()
     )
-    with pd.option_context("display.max_rows", None):
+    with pd.option_context("display.max_rows", 10):
         print(contributor_metrics)
+    contributor_metrics_csv = OUTPUT_DIR + "pull_request_metrics_by_contributor_metrics.csv"
+    contributor_metrics.to_csv(contributor_metrics_csv)
 
     # Capture test failures within the past 30 days
     one_month_ago = datetime.now() - timedelta(days=30)
@@ -354,7 +357,7 @@ def print_metrics(raw_metrics):
     ].nlargest(20, "unique_pr_count")
 
     top_test_impacting_prs_csv = OUTPUT_DIR + "top_test_failures.csv"
-    print(f"Writing weekly_metrics metrics to {top_test_impacting_prs_csv}")
+    print(f"Writing top test impacting metrics to {top_test_impacting_prs_csv}")
     top_test_impacting_prs.to_csv(top_test_impacting_prs_csv)
     print(top_test_impacting_prs)
 
