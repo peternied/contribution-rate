@@ -289,7 +289,7 @@ def print_metrics(raw_metrics):
 
     weekly_metrics_csv = OUTPUT_DIR + "business_days_to_merge_by_week.csv"
     print(f"Writing weekly_metrics metrics to {weekly_metrics_csv}")
-    weekly_metrics.to_csv(weekly_metrics_csv)
+    weekly_metrics.to_csv(weekly_metrics_csv, index=False)
     print(weekly_metrics)
 
     prs_by_type_of_contribution_metrics = (
@@ -307,7 +307,7 @@ def print_metrics(raw_metrics):
     )
     print(prs_by_type_of_contribution_metrics)
     prs_by_type_of_contribution_metrics_csv = OUTPUT_DIR + "pull_requests_metrics_by_type_of_contribution.csv"
-    prs_by_type_of_contribution_metrics.to_csv(prs_by_type_of_contribution_metrics_csv)
+    prs_by_type_of_contribution_metrics.to_csv(prs_by_type_of_contribution_metrics_csv, index=False)
 
     contributor_metrics = (
         raw_metrics.groupby(["type_of_contribution", "user_login"])
@@ -329,7 +329,7 @@ def print_metrics(raw_metrics):
     with pd.option_context("display.max_rows", 10):
         print(contributor_metrics)
     contributor_metrics_csv = OUTPUT_DIR + "pull_request_metrics_by_contributor_metrics.csv"
-    contributor_metrics.to_csv(contributor_metrics_csv)
+    contributor_metrics.to_csv(contributor_metrics_csv, index=False)
 
     # Capture test failures within the past 30 days
     one_month_ago = datetime.now() - timedelta(days=30)
@@ -346,19 +346,23 @@ def print_metrics(raw_metrics):
         .apply(list)
         .reset_index(name="pr_numbers")
     )
-    failures_by_prs["pr_numbers"] = failures_by_prs["pr_numbers"].apply(
-        lambda pr_list: ["#" + str(pr) for pr in pr_list]
-    )
     failures_by_prs["unique_pr_count"] = failures_by_prs["pr_numbers"].apply(
         lambda x: len(set(x))
+    )
+    failures_by_prs["pr_numbers"] = failures_by_prs["pr_numbers"].apply(
+        lambda pr_list: ["#" + str(pr) for pr in pr_list]
     )
     top_test_impacting_prs = failures_by_prs[
         failures_by_prs["unique_pr_count"] >= 2
     ].nlargest(20, "unique_pr_count")
 
+    # Make sure the pr_numbers column is last since it takes up so much space
+    columns_order = [col for col in top_test_impacting_prs.columns if col != 'pr_numbers'] + ['pr_numbers']
+    top_test_impacting_prs = top_test_impacting_prs[columns_order]
+
     top_test_impacting_prs_csv = OUTPUT_DIR + "top_test_failures.csv"
     print(f"Writing top test impacting metrics to {top_test_impacting_prs_csv}")
-    top_test_impacting_prs.to_csv(top_test_impacting_prs_csv)
+    top_test_impacting_prs.to_csv(top_test_impacting_prs_csv, index=False)
     print(top_test_impacting_prs)
 
 
