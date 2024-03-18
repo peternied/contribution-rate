@@ -349,8 +349,11 @@ def print_metrics(raw_metrics):
     failures_by_prs["unique_pr_count"] = failures_by_prs["pr_numbers"].apply(
         lambda x: len(set(x))
     )
+    failures_by_prs["total_fail_count"] = failures_by_prs["pr_numbers"].apply(
+        lambda x: len(x)
+    )
     failures_by_prs["pr_numbers"] = failures_by_prs["pr_numbers"].apply(
-        lambda pr_list: ["#" + str(pr) for pr in pr_list]
+        lambda pr_list: list(set(["#" + str(pr) for pr in pr_list]))
     )
     top_test_impacting_prs = failures_by_prs[
         failures_by_prs["unique_pr_count"] >= 2
