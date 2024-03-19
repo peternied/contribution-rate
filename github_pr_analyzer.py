@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import requests
 
-import request_cache
+from request_cache import RequestCache
 
 # Constants
 HEADERS = {"Accept": "application/vnd.github.v3+json"}
@@ -21,33 +21,16 @@ def github_url():
     return f"https://api.github.com/repos/{ARGS.github_owner}/{ARGS.github_repo}"
 
 
-def get_pull_requests(since=None, pr_number=None):
+def get_pull_requests():
     """
     Fetch pull requests from the GitHub API.
     """
-    pull_requests = []  # List to store pull requests
     params = {
         "state": "closed",
         "sort": "created",
         "direction": "desc",
-        "per_page": 100,
+        "per_page": 10,
     }
-
-    if since:
-        # Ensure 'since' is in ISO 8601 format
-        since = datetime.strptime(since, "%Y-%m-%d").isoformat()
-        params["since"] = since
-
-    if pr_number:
-        # Fetch a specific pull request by number
-        response = requests.get(f"{github_url()}/pulls/{pr_number}", headers=HEADERS)
-        if response.status_code == 200:
-            pull_requests.append(response.json())
-        else:
-            print(f"Error fetching PR #{pr_number}: {response.status_code}")
-        return pull_requests
-
-    # Handle pagination for fetching pull requests
 
     return fetch_github_data(f"{github_url()}/pulls", params)
 
@@ -81,7 +64,7 @@ def fetch_github_data(url, params=None):
             break
         url = response.links["next"]["url"]  # Update the URL to fetch the next page
         pages += 1
-        if pages == ARGS.page_limit:
+        if pages >= ARGS.page_limit:
             print(f"Leaving early for easy of debugging")
             break
 
@@ -89,21 +72,21 @@ def fetch_github_data(url, params=None):
     return all_data
 
 
-def fetch_pr_comments(pr_number, last_modified_time):
+def fetch_pr_comments(cache:RequestCache, pr_number, last_modified_time):
     url = f"{github_url()}/issues/{pr_number}/comments"
-    comments = request_cache.fetch(pr_number, url, last_modified_time, fetch_github_data)
+    comments = cache.fetch(pr_number, url, last_modified_time, fetch_github_data)
     return comments
 
 
-def fetch_pr_events(pr_number, last_modified_time):
+def fetch_pr_events(cache:RequestCache, pr_number, last_modified_time):
     url = f"{github_url()}/issues/{pr_number}/events"
-    events = request_cache.fetch(pr_number, url, last_modified_time, fetch_github_data)
+    events = cache.fetch(pr_number, url, last_modified_time, fetch_github_data)
     return events
 
 
-def fetch_test_results(base_url, pr_number, last_modified_time):
+def fetch_test_results(cache:RequestCache, base_url, pr_number, last_modified_time):
     url = f"{base_url}/testReport/api/json?tree=suites[cases[status,className,name]]"
-    test_results = request_cache.fetch(
+    test_results = cache.fetch(
         pr_number, url, last_modified_time, fetch_json_data
     )
     return test_results
@@ -123,7 +106,7 @@ def fetch_json_data(url):
         return {}
 
 
-def calculate_metrics(pull_requests):
+def calculate_metrics(pull_requests, cache:RequestCache):
     """
     Calculate metrics for each pull request and aggregate them by week.
     """
@@ -160,7 +143,7 @@ def calculate_metrics(pull_requests):
             len(
                 set(
                     comment["user"]["login"]
-                    for comment in fetch_pr_comments(row["number"], row["updated_at"])
+                    for comment in fetch_pr_comments(cache, row["number"], row["updated_at"])
                     if comment["user"]["login"] not in BOTS_TO_IGNORE
                 )
             )
@@ -175,7 +158,7 @@ def calculate_metrics(pull_requests):
             len(
                 list(
                     comment
-                    for comment in fetch_pr_comments(row["number"], row["updated_at"])
+                    for comment in fetch_pr_comments(cache, row["number"], row["updated_at"])
                     if comment["user"]["login"] not in BOTS_TO_IGNORE
                 )
             )
@@ -192,7 +175,7 @@ def calculate_metrics(pull_requests):
         return len(
             list(
                 event
-                for event in fetch_pr_events(row["number"], row["updated_at"])
+                for event in fetch_pr_events(cache, row["number"], row["updated_at"])
                 if event["event"] in ["committed", "head_ref_force_pushed"]
             )
         )
@@ -206,7 +189,7 @@ def calculate_metrics(pull_requests):
         return len(
             list(
                 comment
-                for comment in fetch_pr_comments(row["number"], row["updated_at"])
+                for comment in fetch_pr_comments(cache, row["number"], row["updated_at"])
                 if comment["user"]["login"] in ["github-actions[bot]"]
                 and ":x: Gradle check result" in comment["body"]
             )
@@ -234,7 +217,7 @@ def calculate_metrics(pull_requests):
 
         failing_check_urls = list(
             extract_url(comment["body"])
-            for comment in fetch_pr_comments(row["number"], row["updated_at"])
+            for comment in fetch_pr_comments(cache, row["number"], row["updated_at"])
             if comment["user"]["login"] in ["github-actions[bot]"]
             and ":x: Gradle check result" in comment["body"]
         )
@@ -242,7 +225,7 @@ def calculate_metrics(pull_requests):
             failure
             for failing_check_url in failing_check_urls
             for failure in filter_to_test_failures(
-                fetch_test_results(failing_check_url, row["number"], row["updated_at"])
+                fetch_test_results(cache, failing_check_url, row["number"], row["updated_at"])
             )
         ]
         return list_of_failing_tests
@@ -413,11 +396,9 @@ def simplified_business_days(start, end):
 
 def main():
     parser = argparse.ArgumentParser(description="Analyze GitHub Pull Requests.")
+    parser.add_argument("--mode", choices=['analyze', 'find_pull_requests', 'flush_cache'], help="Mode of operation", default='analyze')
+
     parser.add_argument("--token", type=str, required=True, help="GitHub API token")
-    parser.add_argument(
-        "--since", help="Collect PRs updated after this date (YYYY-MM-DD)."
-    )
-    parser.add_argument("--pr", help="Collect data for a specific PR number.", type=int)
     parser.add_argument(
         "--page-limit",
         help="Limit how much data is pulled from GitHub by page count",
@@ -436,6 +417,8 @@ def main():
         default="opensearch-project",
     )
     parser.add_argument("--github-repo", help="GitHub repository", default="opensearch")
+    parser.add_argument("--cache-stats", help="Print cache stats after the action", action='store_true')
+
 
     global ARGS
     ARGS = parser.parse_args()
@@ -445,10 +428,22 @@ def main():
     ARGS.token = "<HIDDEN>"
     print(f"Arguments: {ARGS}")
 
-    pull_requests = get_pull_requests(ARGS.since, ARGS.pr)
-    pr_metrics = calculate_metrics(pull_requests)
-    print_metrics(pr_metrics)
+    cache = RequestCache()
 
+    if ARGS.mode == 'analyze':
+        print("Analyzing GitHub Pull Requests...")
+        pull_requests = get_pull_requests()
+        pr_metrics = calculate_metrics(pull_requests, cache)
+        print_metrics(pr_metrics)
+    elif ARGS.mode == 'find_pull_requests':
+        print("Finding Pull Requests...")
+    elif ARGS.mode == 'flush_cache':
+        print("Flushing Cached Data...")
+        cache.clear_cache();
+
+    if ARGS.cache_stats:
+        print("Cache details:")
+        print(cache.stats())
 
 if __name__ == "__main__":
     main()

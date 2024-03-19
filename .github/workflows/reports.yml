@@ -28,7 +28,7 @@ jobs:
           pip install -r requirements.txt
 
       - run: |
-          python github_pr_analyzer.py --token ${{ secrets.REPORTS_GITHUB_TOKEN }} --github-owner opensearch-project --github-repo OpenSearch
+          python github_pr_analyzer.py --token ${{ secrets.REPORTS_GITHUB_TOKEN }} --github-owner opensearch-project --github-repo OpenSearch --cache-stats
       
       - run: |
           mkdir -p reports/${{ env.TIMESTAMP }}
