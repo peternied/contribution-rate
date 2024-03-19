@@ -47,7 +47,8 @@ def fetch_github_data(url, params=None):
     A list of items fetched from GitHub.
     """
     all_data = []
-    pages = 1
+    pages = 0
+    has_more_pages = True
     while True:
         print(f"Starting GET {url}...")
         response = requests.get(url, headers=HEADERS, params=params)
@@ -59,16 +60,17 @@ def fetch_github_data(url, params=None):
             break  # Break the loop if no more data are returned
         all_data.extend(page_data)
 
-        # GitHub provides the next page URL in the link header
         if "next" not in response.links:
-            break
-        url = response.links["next"]["url"]  # Update the URL to fetch the next page
-        pages += 1
-        if pages >= ARGS.page_limit:
-            print(f"Leaving early for easy of debugging")
+            has_more_pages = False
             break
 
-    print(f"Load data from github from URL '{url}' in {pages} pages.")
+        pages += 1
+        if pages >= ARGS.page_limit:
+            break
+        # Keep paging
+        url = response.links["next"]["url"]  # Update the URL to fetch the next page
+
+    print(f"Load data from github from URL '{url}' with {pages} pages.  Has more pages? {has_more_pages}")
     return all_data
 
 
@@ -393,11 +395,12 @@ def simplified_business_hours(start, end):
 def simplified_business_days(start, end):
     return simplified_business_hours(start, end) / 8
 
-def print_pr_numbers(pull_requests):
+def save_pr_numbers(pull_requests):
     pr_numbers = set()
     for pr in pull_requests:
-        pr_numbers.add(pr['number'])
-    print(pr_numbers)
+        pr_numbers.add(str(pr['number']) + '\n')
+    with open(f"{OUTPUT_DIR}pr_numbers.txt", "w") as prs_file:
+        prs_file.writelines(pr_numbers)
 
 def main():
     parser = argparse.ArgumentParser(description="Analyze GitHub Pull Requests.")
@@ -438,15 +441,13 @@ def main():
     if ARGS.mode == 'analyze':
         print("Analyzing GitHub Pull Requests...")
         pull_requests = get_pull_requests()
+        save_pr_numbers(pull_requests)
         pr_metrics = calculate_metrics(pull_requests, cache)
         print_metrics(pr_metrics)
     elif ARGS.mode == 'find_pull_requests':
         print("Finding Pull Requests...")
         pull_requests = get_pull_requests()
-        print_pr_numbers(pull_requests)
-    elif ARGS.mode == 'flush_cache':
-        print("Flushing Cached Data...")
-        cache.clear_cache();
+        save_pr_numbers(pull_requests)
 
     if ARGS.cache_stats:
         print("Cache details:")

@@ -18,18 +18,30 @@ jobs:
         with:
           python-version: '3.10'
 
+      - run: |
+          pip install -r requirements.txt
+
+      - name: Compute cache key for pull requests
+        run: |
+          python github_pr_analyzer.py --token ${{ secrets.REPORTS_GITHUB_TOKEN }} --github-owner opensearch-project --github-repo OpenSearch --mode find_pull_requests
+
       - uses: actions/cache@v4
         with:
           path: .request_cache/**
           save-always: true
-          key: request-cache-${{ hashFiles('request_cache.py') }}
-
-      - run: |
-          pip install -r requirements.txt
+          key: request-cache-${{ hashFiles('./output/pr_numbers.txt') }}
+          restore-keys: |
+            request-cache-
 
       - run: |
           python github_pr_analyzer.py --token ${{ secrets.REPORTS_GITHUB_TOKEN }} --github-owner opensearch-project --github-repo OpenSearch --cache-stats
-      
+
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: .request_cache/**
+          key: request-cache-${{ hashFiles('./output/pr_numbers.txt') }}
+
       - run: |
           mkdir -p reports/${{ env.TIMESTAMP }}
           mv output/*.csv reports/${{ env.TIMESTAMP }}/
