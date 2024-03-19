@@ -29,7 +29,7 @@ def get_pull_requests():
         "state": "closed",
         "sort": "created",
         "direction": "desc",
-        "per_page": 10,
+        "per_page": 100,
     }
 
     return fetch_github_data(f"{github_url()}/pulls", params)
@@ -393,6 +393,11 @@ def simplified_business_hours(start, end):
 def simplified_business_days(start, end):
     return simplified_business_hours(start, end) / 8
 
+def print_pr_numbers(pull_requests):
+    pr_numbers = set()
+    for pr in pull_requests:
+        pr_numbers.add(pr['number'])
+    print(pr_numbers)
 
 def main():
     parser = argparse.ArgumentParser(description="Analyze GitHub Pull Requests.")
@@ -437,6 +442,8 @@ def main():
         print_metrics(pr_metrics)
     elif ARGS.mode == 'find_pull_requests':
         print("Finding Pull Requests...")
+        pull_requests = get_pull_requests()
+        print_pr_numbers(pull_requests)
     elif ARGS.mode == 'flush_cache':
         print("Flushing Cached Data...")
         cache.clear_cache();
