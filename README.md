@@ -4,11 +4,11 @@ Small python executable to measure details impacting contribution rate for OpenS
 
 ## Reports
 <!-- REPORTS_START -->
-_Updated on May 29, 2024_
-- [Latest business_days_to_merge_by_week Report](/reports/20240529/business_days_to_merge_by_week.csv)
-- [Latest pull_request_metrics_by_contributor_metrics Report](/reports/20240529/pull_request_metrics_by_contributor_metrics.csv)
-- [Latest pull_requests_metrics_by_type_of_contribution Report](/reports/20240529/pull_requests_metrics_by_type_of_contribution.csv)
-- [Latest top_test_failures Report](/reports/20240529/top_test_failures.csv)
+_Updated on May 30, 2024_
+- [Latest business_days_to_merge_by_week Report](/reports/20240530/business_days_to_merge_by_week.csv)
+- [Latest pull_request_metrics_by_contributor_metrics Report](/reports/20240530/pull_request_metrics_by_contributor_metrics.csv)
+- [Latest pull_requests_metrics_by_type_of_contribution Report](/reports/20240530/pull_requests_metrics_by_type_of_contribution.csv)
+- [Latest top_test_failures Report](/reports/20240530/top_test_failures.csv)
 <!-- REPORTS_END -->
 
 ## Usage
