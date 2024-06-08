@@ -1,0 +1,13 @@
+failing_tests,unique_pr_count,total_fail_count,pr_numbers
+"org.opensearch.indices.IndicesRequestCacheIT.testDeleteAndCreateSameIndexShardOnSameNode {p0={""opensearch.experimental.feature.pluggable.caching.enabled"":""false""}}",12,17,"['#13756', '#13767', '#13753', '#13765', '#13799', '#13750', '#13762', '#13860', '#13617', '#13752', '#13678', '#13822']"
+"org.opensearch.indices.IndicesRequestCacheIT.testDeleteAndCreateSameIndexShardOnSameNode {p0={""opensearch.experimental.feature.pluggable.caching.enabled"":""true""}}",12,17,"['#13756', '#13767', '#13753', '#13765', '#13799', '#13750', '#13762', '#13860', '#13617', '#13752', '#13678', '#13822']"
+"org.opensearch.indices.IndicesRequestCacheIT.testDeleteAndCreateSameIndexShardOnSameNode {p0={""search.concurrent_segment_search.enabled"":""false""}}",12,17,"['#13756', '#13767', '#13753', '#13765', '#13799', '#13750', '#13762', '#13860', '#13617', '#13752', '#13678', '#13822']"
+"org.opensearch.indices.IndicesRequestCacheIT.testDeleteAndCreateSameIndexShardOnSameNode {p0={""search.concurrent_segment_search.enabled"":""true""}}",12,17,"['#13756', '#13767', '#13753', '#13765', '#13799', '#13750', '#13762', '#13860', '#13617', '#13752', '#13678', '#13822']"
+org.opensearch.remotemigration.RemoteReplicaRecoveryIT.testReplicaRecovery,6,8,"['#13767', '#13753', '#13765', '#13762', '#13752', '#13756']"
+org.opensearch.cluster.coordination.AwarenessAttributeDecommissionIT.testConcurrentDecommissionAction,4,15,"['#13765', '#13750', '#13752', '#13756']"
+org.opensearch.common.cache.stats.DefaultCacheStatsHolderTests.testConcurrentRemoval,3,3,"['#13752', '#13767', '#13678']"
+org.opensearch.indices.IndicesRequestCacheIT.classMethod,3,4,"['#13678', '#13753', '#13756']"
+org.opensearch.action.admin.cluster.node.tasks.ResourceAwareTasksTests.testTaskResourceTrackingDuringTaskCancellation,2,2,"['#13753', '#13678']"
+org.opensearch.index.remote.RemoteSegmentTransferTrackerTests.testComputeTimeLagOnUpdate,2,2,"['#13761', '#13799']"
+org.opensearch.indices.recovery.ReplicaToPrimaryPromotionIT.testPromoteReplicaToPrimary,2,2,"['#13710', '#13753']"
+org.opensearch.repositories.azure.AzureBlobStoreRepositoryTests.testWriteRead,2,2,"['#13757', '#13678']"
